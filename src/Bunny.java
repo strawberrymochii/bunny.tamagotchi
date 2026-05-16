@@ -98,6 +98,24 @@ public class Bunny {
 			JOptionPane.showMessageDialog(null, "You guessed the wrong number...");
 		}
 	}
+
+	// headless-friendly play method (no UI prompts)
+	public void playHeadless() {
+		if (this.bytEnergy >= 10) {
+			this.bytEnergy -= 10;
+		} else {
+			this.bytEnergy = 0;
+		}
+		// small chance to increase happiness
+		double chance = Math.random();
+		if (chance < 0.35) {
+			if (this.bytHappiness < 90) {
+				this.bytHappiness += 10;
+			} else {
+				this.bytHappiness = 100;
+			}
+		}
+	}
 	
 
 }
