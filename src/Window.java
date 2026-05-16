@@ -18,7 +18,9 @@ public class Window extends JFrame{
 		this.setSize(200, 350);
 		this.setLayout(new BorderLayout());
 		this.setVisible(true);
-		
+
+		this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
 		//create the main panel
 		JPanel gameScreen = new JPanel();
 		gameScreen.setSize(200, 350);
