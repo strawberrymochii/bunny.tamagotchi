@@ -1,0 +1,37 @@
+# --- Stage 1: Build Stage ---
+FROM maven:3.9-eclipse-temurin-17-alpine AS builder
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy the pom.xml file first to cache dependencies
+COPY pom.xml .
+
+# Download dependencies (this layer will be cached unless pom.xml changes)
+RUN mvn dependency:go-offline -B
+
+# Copy the application source code
+COPY src ./src
+
+# Package the application (skipping tests for faster deployment builds)
+RUN mvn clean package -DskipTests
+
+# --- Stage 2: Runner Stage ---
+FROM eclipse-temurin:17-jre-alpine AS runner
+
+WORKDIR /app
+
+# Create a non-root user for security
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring:spring
+
+# Copy the compiled JAR file from the builder stage
+# Note: Adjust 'app-0.0.1-SNAPSHOT.jar' to match your actual target JAR name
+COPY --from=builder /app/target/*.jar app.jar
+
+# Render automatically assigns a PORT environment variable, 
+# but exposing 10000 is a standard default for Render
+EXPOSE 10000
+
+# Start the application, passing the Render PORT env variable to Spring Boot
+ENTRYPOINT ["java", "-jar", "app.jar", "--server.port=${PORT:10000}"]
