@@ -1,31 +1,37 @@
-FROM ubuntu:22.04
-ENV DEBIAN_FRONTEND=noninteractive
+# --- Stage 1: Build Stage ---
+FROM maven:3.9-eclipse-temurin-17-alpine AS builder
 
-# Install OpenJDK, Xvfb, x11vnc, a lightweight window manager, git and python tools
-RUN apt-get update \
-	&& apt-get install -y --no-install-recommends \
-	   openjdk-17-jdk xvfb x11vnc fluxbox git python3-pip wget ca-certificates \
-	&& pip3 install websockify \
-	&& apt-get clean \
-	&& rm -rf /var/lib/apt/lists/*
-
-# Install noVNC and websockify sources (web files served by websockify)
-RUN git clone https://github.com/novnc/noVNC.git /opt/novnc \
-	&& git clone https://github.com/novnc/websockify.git /opt/websockify \
-	&& pip3 install /opt/websockify
-
+# Set the working directory inside the container
 WORKDIR /app
+
+# Copy the pom.xml file first to cache dependencies
+COPY pom.xml .
+
+# Download dependencies (this layer will be cached unless pom.xml changes)
+RUN mvn dependency:go-offline -B
+
+# Copy the application source code
 COPY src ./src
 
-# Compile Java sources
-RUN mkdir -p out && javac -d out src/*.java
+# Package the application (skipping tests for faster deployment builds)
+RUN mvn clean package -DskipTests
 
-# Start script
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
+# --- Stage 2: Runner Stage ---
+FROM eclipse-temurin:17-jre-alpine AS runner
 
-# Expose the port that noVNC will listen on (Render provides PORT at runtime)
-ENV PORT=8080
-EXPOSE 8080
+WORKDIR /app
 
-CMD ["/start.sh"]
+# Create a non-root user for security
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring:spring
+
+# Copy the compiled JAR file from the builder stage
+# Note: Adjust 'app-0.0.1-SNAPSHOT.jar' to match your actual target JAR name
+COPY --from=builder /app/target/*.jar app.jar
+
+# Render automatically assigns a PORT environment variable, 
+# but exposing 10000 is a standard default for Render
+EXPOSE 10000
+
+# Start the application, passing the Render PORT env variable to Spring Boot
+ENTRYPOINT ["java", "-jar", "app.jar", "--server.port=${PORT:10000}"]
