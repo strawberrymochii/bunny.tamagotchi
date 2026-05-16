@@ -1,17 +1,31 @@
-FROM openjdk:17-jdk-slim
+FROM ubuntu:22.04
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install OpenJDK, Xvfb, x11vnc, a lightweight window manager, git and python tools
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends \
+	   openjdk-17-jdk xvfb x11vnc fluxbox git python3-pip wget ca-certificates \
+	&& pip3 install websockify \
+	&& apt-get clean \
+	&& rm -rf /var/lib/apt/lists/*
+
+# Install noVNC and websockify sources (web files served by websockify)
+RUN git clone https://github.com/novnc/noVNC.git /opt/novnc \
+	&& git clone https://github.com/novnc/websockify.git /opt/websockify \
+	&& pip3 install /opt/websockify
+
 WORKDIR /app
+COPY src ./src
 
-# Copy source and compiled output (if present)
-COPY . /app
+# Compile Java sources
+RUN mkdir -p out && javac -d out src/*.java
 
-# Compile Java sources into /app/out
-RUN mkdir -p out && javac -d out src/*.java || true
+# Start script
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
 
-# Default to headless mode so the container doesn't require a display
-ENV HEADLESS=1
-
-# Expose port used by headless HTTP server
+# Expose the port that noVNC will listen on (Render provides PORT at runtime)
+ENV PORT=8080
 EXPOSE 8080
 
-# Start the application using the compiled classes
-CMD ["java", "-cp", "out", "Main"]
+CMD ["/start.sh"]
