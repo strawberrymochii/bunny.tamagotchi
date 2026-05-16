@@ -1,0 +1,17 @@
+FROM openjdk:17-jdk-slim
+WORKDIR /app
+
+# Copy source and compiled output (if present)
+COPY . /app
+
+# Compile Java sources into /app/out
+RUN mkdir -p out && javac -d out src/*.java || true
+
+# Default to headless mode so the container doesn't require a display
+ENV HEADLESS=1
+
+# Expose port used by headless HTTP server
+EXPOSE 8080
+
+# Start the application using the compiled classes
+CMD ["java", "-cp", "out", "Main"]
